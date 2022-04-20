@@ -4,7 +4,7 @@ categories = ["embedded", "hardware-support", "no-std"]
 description = "Raspberry Pi Rust driver for the DHT11 temperature and humidity sensor."
 edition = "2021"
 homepage = "https://github.com/Xavientois/rppal-dht11-rs"
-keywords = ["embedded", "raspberry pi"]
+keywords = ["embedded", "raspberry", "pi"]
 include = [
     "**/*.rs",
     "Cargo.toml",
