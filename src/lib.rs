@@ -1,67 +1,32 @@
-//! Platform-agnostic Rust driver for the DHT11 temperature and humidity sensor,
-//! using [`embedded-hal`](https://github.com/rust-embedded/embedded-hal) traits.
+//! Raspberry Pi Rust driver for the DHT11 temperature and humidity sensor, compatible with the [rppal](https://docs.golemparts.com/rppal/0.13.1/rppal/gpio/struct.IoPin.html#) GPIO library `IoPin` type.
 //!
-//! # Examples
-//!
-//! An example for the STM32F407 microcontroller can be found in the source repository.
-//!
-//! ```
-//! // Open drain pin compatibible with HAL
-//! let pin = gpio.pe2.into_open_drain_output();
-//!
-//! // SysTick-based HAL `Delay` on Cortex-M
-//! let mut delay = Delay::new(cp.SYST, clocks);
-//!
-//! let mut dht11 = Dht11::new(pin);
-//!
-//! match dht11.perform_measurement(&mut delay) {
-//!     Ok(meas) => hprintln!("Temp: {} Hum: {}", meas.temperature, meas.humidity).unwrap(),
-//!     Err(e) => hprintln!("Error: {:?}", e).unwrap(),
-//! };
-//! ```
-//!
-//! # Optional features
-//!
-//! ## `dwt`
-//!
-//! In applications with multiple, frequent interrupts being handled by the system, the traditional
-//! delay-based approach achievable using only traits provided by `embedded-hal` may lead to
-//! incorrect bit readings, and thus timeout and CRC errors.
-//!
-//! Enabling this feature will cause the crate to use the DWT counter available on some ARM Cortex-M
-//! families to more accurately measure bit times, thus greatly reducing inaccuracies introduced
-//! by external interrupts.
 
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 #![cfg_attr(not(test), no_std)]
 
-use embedded_hal::{
-    blocking::delay::{DelayMs, DelayUs},
-    digital::v2::{InputPin, OutputPin},
-};
+use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use rppal::gpio::{IoPin, Mode};
 
-#[cfg(feature = "dwt")]
-use cortex_m::peripheral::DWT;
-
-/// How long to wait for a pulse on the data line (in microseconds).
+/// How long to wait for a pulse on the data line (in microseconds)
 const TIMEOUT_US: u16 = 1_000;
+
+/// How long to wait between successive retries (in milliseconds)
+const RETRY_DELAY: u16 = 100;
 
 /// Error type for this crate.
 #[derive(Debug)]
-pub enum Error<E> {
+pub enum Error {
     /// Timeout during communication.
     Timeout,
     /// CRC mismatch.
     CrcMismatch,
-    /// GPIO error.
-    Gpio(E),
 }
 
 /// A DHT11 device.
-pub struct Dht11<GPIO> {
+pub struct Dht11 {
     /// The concrete GPIO pin implementation.
-    gpio: GPIO,
+    gpio: IoPin,
 }
 
 /// Results of a reading performed by the DHT11.
@@ -73,22 +38,40 @@ pub struct Measurement {
     pub humidity: u16,
 }
 
-impl<GPIO, E> Dht11<GPIO>
-where
-    GPIO: InputPin<Error = E> + OutputPin<Error = E>,
-{
+impl Dht11 {
     /// Creates a new DHT11 device connected to the specified pin.
-    pub fn new(gpio: GPIO) -> Self {
+    pub fn new(gpio: IoPin) -> Self {
         Dht11 { gpio }
     }
 
-    /// Destroys the driver, returning the GPIO instance.
-    pub fn destroy(self) -> GPIO {
+    /// Destroys the driver, returning the IoPin instance.
+    pub fn destroy(self) -> IoPin {
         self.gpio
     }
 
+    /// Attempts readings of the sensor up to `retries` times
+    /// and returns the first successful reading or the last error
+    pub fn perform_measurement_with_retries<D>(
+        &mut self,
+        delay: &mut D,
+        retries: u16,
+    ) -> Result<Measurement, Error>
+    where
+        D: DelayUs<u16> + DelayMs<u16>,
+    {
+        let mut result = self.perform_measurement(delay);
+        for _ in 0..retries {
+            if result.is_ok() {
+                break;
+            }
+            delay.delay_ms(RETRY_DELAY);
+            result = self.perform_measurement(delay);
+        }
+        result
+    }
+
     /// Performs a reading of the sensor.
-    pub fn perform_measurement<D>(&mut self, delay: &mut D) -> Result<Measurement, Error<E>>
+    pub fn perform_measurement<D>(&mut self, delay: &mut D) -> Result<Measurement, Error>
     where
         D: DelayUs<u16> + DelayMs<u16>,
     {
@@ -106,7 +89,7 @@ where
         }
 
         // Finally wait for line to go idle again.
-        self.wait_for_pulse(true, delay)?;
+        //self.wait_for_pulse(true, delay)?;
 
         // Check CRC
         let crc = data[0]
@@ -129,21 +112,24 @@ where
         })
     }
 
-    fn perform_handshake<D>(&mut self, delay: &mut D) -> Result<(), Error<E>>
+    fn perform_handshake<D>(&mut self, delay: &mut D) -> Result<(), Error>
     where
         D: DelayUs<u16> + DelayMs<u16>,
     {
+        self.gpio.set_mode(Mode::Output);
         // Set pin as floating to let pull-up raise the line and start the reading process.
-        self.set_input()?;
+        self.gpio.set_high();
         delay.delay_ms(1);
 
         // Pull line low for at least 18ms to send a start command.
-        self.set_low()?;
+        self.gpio.set_low();
         delay.delay_ms(20);
 
         // Restore floating
-        self.set_input()?;
+        self.gpio.set_high();
         delay.delay_us(40);
+
+        self.gpio.set_mode(Mode::Input);
 
         // As a response, the device pulls the line low for 80us and then high for 80us.
         self.read_bit(delay)?;
@@ -151,7 +137,7 @@ where
         Ok(())
     }
 
-    fn read_bit<D>(&mut self, delay: &mut D) -> Result<bool, Error<E>>
+    fn read_bit<D>(&mut self, delay: &mut D) -> Result<bool, Error>
     where
         D: DelayUs<u16> + DelayMs<u16>,
     {
@@ -160,16 +146,13 @@ where
         Ok(high > low)
     }
 
-    fn wait_for_pulse<D>(&mut self, level: bool, delay: &mut D) -> Result<u32, Error<E>>
+    fn wait_for_pulse<D>(&mut self, level: bool, delay: &mut D) -> Result<u32, Error>
     where
         D: DelayUs<u16> + DelayMs<u16>,
     {
         let mut count = 0;
 
-        #[cfg(feature = "dwt")]
-        let start = DWT::get_cycle_count();
-
-        while self.read_line()? != level {
+        while self.gpio.is_high() != level {
             count += 1;
             if count > TIMEOUT_US {
                 return Err(Error::Timeout);
@@ -177,22 +160,6 @@ where
             delay.delay_us(1);
         }
 
-        #[cfg(feature = "dwt")]
-        return Ok(DWT::get_cycle_count().wrapping_sub(start));
-
-        #[cfg(not(feature = "dwt"))]
         return Ok(u32::from(count));
-    }
-
-    fn set_input(&mut self) -> Result<(), Error<E>> {
-        self.gpio.set_high().map_err(Error::Gpio)
-    }
-
-    fn set_low(&mut self) -> Result<(), Error<E>> {
-        self.gpio.set_low().map_err(Error::Gpio)
-    }
-
-    fn read_line(&self) -> Result<bool, Error<E>> {
-        self.gpio.is_high().map_err(Error::Gpio)
     }
 }

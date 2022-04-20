@@ -1,44 +1,26 @@
 [package]
-authors = ["Pietro Lorefice <pietro.lorefice@gmail.com>"]
+authors = ["Xavientois <joshua.rampersad@hotmail.com>", "Pietro Lorefice <pietro.lorefice@gmail.com>"]
 categories = ["embedded", "hardware-support", "no-std"]
-description = "Platform-agnostic Rust driver for the DHT11 temperature and humidity sensor."
-edition = "2018"
-homepage = "https://github.com/plorefice/dht11-rs"
-keywords = ["embedded-hal-driver"]
+description = "Raspberry Pi Rust driver for the DHT11 temperature and humidity sensor."
+edition = "2021"
+homepage = "https://github.com/Xavientois/rppal-dht11-rs"
+keywords = ["embedded", "raspberry pi"]
 include = [
     "**/*.rs",
     "Cargo.toml",
 ]
 license = "MIT OR Apache-2.0"
-name = "dht11"
+name = "rppal-dht11"
 readme = "README.md"
-repository = "https://github.com/plorefice/dht11-rs"
+repository = "https://github.com/Xavientois/rppal-dht11-rs"
 version = "0.3.1"
 
 [dependencies]
-embedded-hal = { version = "0.2", features = ["unproven"] }
-cortex-m = { version = "0.6", optional = true }
-
-[dev-dependencies]
-cortex-m = "0.6"
-cortex-m-rt = "0.6"
-cortex-m-semihosting = "0.3"
-panic-semihosting = "0.5"
-
-[dev-dependencies.stm32f4xx-hal]
-version = "0.8"
-features = ["rt", "stm32f407"]
-
-[features]
-default = []
-dwt = ["cortex-m"]
+rppal = { version = "0.13", features = ["hal"] }
+embedded-hal = { version = "0.2.7" }
 
 [[example]]
-name = "stm32f407"
-
-[[example]]
-name = "stm32f407-dwt"
-required-features = ["dwt"]
+name = "rppal"
 
 [profile.release]
 lto = true
