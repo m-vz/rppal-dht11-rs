@@ -37,6 +37,7 @@ println!("{:?}", measurement);
 ## License
 
 Copyright © 2020 Pietro Lorefice
+Copyright © 222 Xavientois
 
 Dual licensed under your choice of either of:
 
