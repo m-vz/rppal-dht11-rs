@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0"
 name = "rppal-dht11"
 readme = "README.md"
 repository = "https://github.com/Xavientois/rppal-dht11-rs"
-version = "0.3.1"
+version = "0.4.0"
 
 [dependencies]
 rppal = { version = "0.13", features = ["hal"] }
