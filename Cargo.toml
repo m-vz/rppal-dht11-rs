@@ -1,14 +1,14 @@
 [package]
-authors = ["Xavientois <joshua.rampersad@hotmail.com>", "Pietro Lorefice <pietro.lorefice@gmail.com>"]
+authors = [
+    "Xavientois <joshua.rampersad@hotmail.com>",
+    "Pietro Lorefice <pietro.lorefice@gmail.com>",
+]
 categories = ["embedded", "hardware-support", "no-std"]
 description = "Raspberry Pi Rust driver for the DHT11 temperature and humidity sensor."
 edition = "2021"
 homepage = "https://github.com/Xavientois/rppal-dht11-rs"
 keywords = ["embedded", "raspberry", "pi"]
-include = [
-    "**/*.rs",
-    "Cargo.toml",
-]
+include = ["**/*.rs", "Cargo.toml"]
 license = "MIT OR Apache-2.0"
 name = "rppal-dht11"
 readme = "README.md"
@@ -16,7 +16,7 @@ repository = "https://github.com/Xavientois/rppal-dht11-rs"
 version = "0.4.0"
 
 [dependencies]
-rppal = { version = "0.13", features = ["hal"] }
+rppal = { version = "0.22.1", features = ["hal"] }
 embedded-hal = { version = "0.2.7" }
 
 [[example]]
